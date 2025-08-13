@@ -21,7 +21,7 @@ su - obeaj <<'EOF'
     mkdir -p binutils-build
     cd binutils-build
     ../binutils-2.41/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
-    make          # <--- runs sequentially
+    make
     make install
     cd ..
 
@@ -29,14 +29,14 @@ su - obeaj <<'EOF'
     cd gcc-13.2.0
     ./contrib/download_prerequisites
     cd ..
-
     mkdir -p gcc-build
     cd gcc-build
     ../gcc-13.2.0/configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
-    make all-gcc              # <--- runs sequentially
-    make all-target-libgcc    # <--- runs sequentially
+    make all-gcc
+    make all-target-libgcc
     make install-gcc
     make install-target-libgcc
+
     export PATH="$HOME/opt/cross/bin:$PATH"
     source ~/.bashrc
 EOF

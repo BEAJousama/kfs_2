@@ -1,14 +1,12 @@
 # === File paths ===
-KERNEL_SRC = src/kernel.c src/helpers.c src/terminal.c src/scroll.c src/kprintf.c src/gdt.c src/idt.c src/irq.c src/isrs.c src/kbdus.c src/shell.c 
+KERNEL_SRC = src/kernel.c src/helpers.c src/terminal.c src/kprintf.c src/gdt.c src/idt.c src/irq.c src/isrs.c src/kbdus.c
 
 # === Build paths ===
-KERNEL_OBJ = build/kernel.o build/helpers.o build/terminal.o build/scroll.o build/kprintf.o build/gdt.o build/idt.o build/irq.o build/isrs.o build/kbdus.o build/shell.o
-
+KERNEL_OBJ = build/kernel.o build/helpers.o build/terminal.o build/kprintf.o build/gdt.o build/idt.o build/irq.o build/isrs.o build/kbdus.o
 
 BOOT_SRC   = src/boot.s
 START_SRC  = src/start.asm
 LINKER     = src/linker.ld
-
 
 BOOT_OBJ   = build/boot.o
 START_OBJ  = build/start.o
@@ -54,5 +52,6 @@ run: $(ISO_IMAGE)
 
 # === Clean build files ===
 clean:
-	rm -rf build/*
-	rm -rf isodir/boot/*
+	rm -rf build/*.o build/*.bin isodir
+
+.PHONY: all clean run

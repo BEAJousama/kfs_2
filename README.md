@@ -3,154 +3,121 @@
 
 # Fundamentals:
 
-# Booting process in linux and GRUB:
+# GCC Cross-Compiler:
 
-    https://github.com/nu11secur1ty/All-Stages-of-Linux-Booting-Process-Architecture 
-    https://en.wikipedia.org/wiki/GNU_GRUB
+Generally speaking, a cross-compiler is a compiler that runs on platform A (the host), but generates executables for platform B (the target). These two platforms may (but do not need to) differ in CPU, operating system, and/or executable format. In our case, the host platform is your current operating system and the target platform is the operating system you are about to make. It is important to realize that these two platforms are not the same; the operating system you are developing is always going to be different from the operating system you currently use.
 
-# Making a cross compiler:
+## Why cross-compilers are necessary
 
-    https://wiki.osdev.org/GCC_Cross-Compiler
+The compiler must know the correct target platform (CPU, operating system). The compiler that comes with the host system does not know by default that it is compiling something else entirely, unless a lot of problematic options are passed to it, which will create a lot of problems in the future. The solution is to build a cross-compiler.
 
-# KFS x86
+# bootstrapping:
 
-    https://wiki.osdev.org/Bare_Bones
+When a PC boots, it goes through a process called bootstrapping, which involves initializing hardware and loading the operating system. This process starts when the computer is powered on and ends when the operating system is loaded and ready for use.
 
-# Multiboot2 header specification and implementation
+Here's a more detailed breakdown:
 
-    https://nongnu.askapache.com/grub/phcoder/multiboot.pdf 
-    https://intermezzos.github.io/book/first-edition/multiboot-headers.html
+    1. Power-on and Initial Checks:
+        When the computer is switched on, the power supply sends electricity to all components. The BIOS (or UEFI) on the motherboard initializes the hardware, including the CPU, memory... 
+    2. POST:
+        The BIOS/UEFI then runs a Power-On Self-Test (POST). This test checks the basic functionality of the hardware, like the RAM, video card, and other essential components. If an error is detected during POST, the computer may display an error message or halt the boot process.
+    3. Boot Device Selection:
+        The BIOS/UEFI then identifies the boot device, which is usually the hard drive or SSD where the operating system is stored.
+    4. Loading the Operating System:
+        The BIOS/UEFI loads the bootloader from the boot device. The bootloader, a small program, then loads the main part of the operating system into the computer's memory (RAM).
+    5. System Configuration and User Login:
+        Once the operating system is loaded, it performs further system configuration tasks, such as loading drivers for devices and starting necessary services. Finally, the user is presented with a login screen to access their user account.
 
-# Steps:
+## Bootloader:
 
-    In a linux machine, set up a cross-compiler for x86 architecture.
-    If you are using NASM, you should build it aswell (does not come with binutils).(can use nasm of the host)
-    Create a multiboot header based on the grub specification.
-    Create C code that write to the screen and compile it.
-    Create Linker script that will link the object files, generate and align the sections.
-    Compile and Link with appropriate flags to get kernel binary
-    Use grub-mkrescue to generate a bootable file .iso
+A bootloader is a small program whose primary role is to load the operating system kernel into memory and transfer control to it. It operates in a very minimal environment without multitasking, virtual memory, or drivers.
+In OS development, the bootloader serves as the bridge between firmware (BIOS/UEFI) and the kernel.
 
+## GRUB:
 
-Here are the exact command-line steps, one by one, for downloading the source code of Binutils and GCC, into a $HOME/src directory:
+GRUB is one of the most popular bootloaders used in Linux and custom OS development. It supports many filesystems and kernels, and is compliant with the Multiboot specification.
 
-1. Create the source directory:
+## Multiboot:
 
-```
-    mkdir -p $HOME/src
-    cd $HOME/src
-```
+Multiboot is a specification that defines a standard way for bootloaders (like GRUB) to load operating system kernels.
+By conforming to the Multiboot spec, your kernel becomes bootloader-agnostic GRUB and other Multiboot-compliant bootloaders will be able to load it without custom logic.
 
-2. Download Binutils 2.41:
+## Multiboot Header:
 
-```
-    curl -O https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
-```
+To be recognized as a Multiboot kernel, your kernel binary must include a header with:
 
-3. Download GCC 13.2.0:
+- A magic number (0x1BADB002)
 
-```
-    curl -O https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
-```
+- A flags field (requesting memory info, alignment, etc.)
 
-4. Extract both archives
+- A checksum (ensures integrity)
 
-```
-    tar -xf binutils-2.41.tar.xz
-    tar -xf gcc-13.2.0.tar.xz
-```
+This header must appear within the first 8 KiB of the kernel file.
 
+# Linker:
 
-Set up environment variables (manually for each terminal session):
+A linker script is a configuration file used by the ld linker to control:
 
-```
-    export TARGET=i686-elf
-    export PREFIX="$HOME/opt/cross"
-    export PATH="$PREFIX/bin:$PATH"
-```
+- Where in memory your kernel gets loaded
 
-🛠 Step 1: Build and Install Binutils
-Create a separate build directory for Binutils:
+- Where the bootloader should jump to start executing
 
-```
-    mkdir -p $HOME/src/binutils-build
-    cd $HOME/src/binutils-build
-```
+- How sections like .text, .data, .bss, and the stack are arranged in memory
 
-Configure Binutils:
+- Alignment rules for memory sections (e.g., 4K page boundaries)
 
-```
-    ../binutils-2.41/configure --target=$TARGET --prefix=$PREFIX --with-sysroot --disable-nls --disable-werror
-```
+# GDT:
 
-Build Binutils:
+Global Descriptor Table:
 
-```
-    make
-```
+- The GDT defines base access privileges for certain parts of memory.
+- We can use an entry in the GDT to generate segment violation exceptions that give the kernel an opportunity to end a process that is doing something it shouldn't.
+- The GDT can define if a section in memory is executable or if it is infact, data.
+- The GDT itself is a list of 64-bit long entries. These entries define where in memory that the allowed region will start, as well as the limit of this region, and the access privileges associated with this entry.
+-  One common rule is that the first entry in your GDT, entry 0, is known as the NULL descriptor. No segment register should be set to 0, otherwise this will cause a General Protection fault, and is a protection feature of the processor. 
+- Each GDT entry also defines whether or not the current segment that the processor is running in is for System use (Ring 0) or for Application use (Ring 3).
 
-Install Binutils:
+# IDT:
 
-```
-    make install
-```
+Interrupt Descriptor Table:
 
-You now have i686-elf-as, i686-elf-ld, etc., installed.
+- Is used in order to show the processor what Interrupt Service Routine (ISR) to call to handle either an exception or an 'int' opcode (in assembly).
+- IDT entries are also called by Interrupt Requests whenever a device has completed a request and needs to be serviced.
 
-Step 2: Build and Install GCC (minimal C only, no headers yet)
-Download prerequisites (from within the GCC source dir):
+# ISR:
 
-```
-    cd $HOME/src/gcc-13.2.0
-    ./contrib/download_prerequisites
-```
+Interrupt Service Routines:
 
-Create a separate build directory for GCC:
+- Used to save the current processor state and set up the appropriate segment registers needed for kernel mode before the kernel's C-level interrupt handler is called. 
 
-```
-    mkdir -p $HOME/src/gcc-build
-    cd $HOME/src/gcc-build
-```
+## Types of interrupts:
 
-Configure GCC:
+- Hardware interrupts
+Triggered by external devices: keyboard press, mouse move, network packet, timer tick.
 
-```
-    ../gcc-13.2.0/configure --target=$TARGET --prefix=$PREFIX --disable-nls --enable-languages=c --without-headers
-```
+- Software interrupts
+Triggered by programs using special CPU instructions (e.g., int 0x80 in Linux syscalls).
 
-Build the minimal cross-compiler:
+- CPU exceptions
+Triggered when the CPU detects an error: divide by zero, invalid instruction, page fault, general protection fault.
 
-```
-    make all-gcc
-```
+# To DO:
 
-Build libgcc (without libc headers):
+vagrantfile
+gcc_cross
+makefile
 
-```
-    make all-target-libgcc
-```
-
-Install both:
-
-```
-    make install-gcc
-    make install-target-libgcc
-```
-
-Test It
-
-```
-    $PREFIX/bin/i686-elf-gcc --version
-````
-
-You should see something like i686-elf-gcc (GCC) 13.2.0.
+linker
+boot.s
+grub.cfg
 
 
-sudo /home/obeaj/opt/cross/bin/i686-elf-as boot.s -o boot.o
-sudo /home/obeaj/opt/cross/bin/i686-elf-gcc -c kernel.c -o kernel.o -std=gnu99 -ffreestanding -O2 -Wall -Wextra
-sudo /home/obeaj/opt/cross/bin/i686-elf-gcc -T linker.ld -o myos.bin -ffreestanding -O2 -nostdlib boot.o kernel.o -lgcc
+terminal.c
+kprintf.c
 
-
-
-export PATH="$HOME/opt/cross/bin:$PATH"
-source ~/.bashrc
+gdt.c
+idt.c
+isrs.c
+irq.c
+kbdus.c
+start.asm

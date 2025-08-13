@@ -1,4 +1,46 @@
-#include "kernel.h"
+#include "../include/kernel.h"
+
+void kputs(const char* str)
+{
+    for (size_t i = 0; str[i]; i++)
+    {
+        kputchar(str[i]);
+    }
+}
+
+const char *exception_messages[] = {
+	"Division By Zero",
+	"Debug",
+	"Non Maskable Interrupt",
+	"Breakpoint",
+	"Into Detected Overflow",
+	"Out of Bounds",
+	"Invalid Opcode",
+	"No Coprocessor",
+	"Double Fault",
+	"Coprocessor Segment Overrun",
+	"Bad TSS",
+	"Segment Not Present",
+	"Stack Fault",
+	"General Protection Fault",
+	"Page Fault",
+	"(Unknown Interrupt)",
+	"Coprocessor Fault",
+	"Alignment Check",
+	"Machine Check",
+	"SIMD Floating-Point Exception",
+	"Virtualization Exception",
+	"Control Protection Exception",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved",
+	"Reserved"
+};
 
 extern void isr0();
 extern void isr1();
@@ -32,7 +74,6 @@ extern void isr28();
 extern void isr29();
 extern void isr30();
 extern void isr31();
-
 
 void isrs_install() 
 {
@@ -69,40 +110,6 @@ void isrs_install()
 	idt_set_gate(30, (unsigned)isr30, 0x08, 0x8E);
 	idt_set_gate(31, (unsigned)isr31, 0x08, 0x8E);
 }
-
-const char *exception_messages[] = {
-	"Division By Zero",
-	"Debug",
-	"Non Maskable Interrupt",
-	"Breakpoint",
-	"Into Detected Overflow",
-	"Out of Bounds",
-	"Invalid Opcode",
-	"No Coprocessor",
-	"Double Fault",
-	"Coprocessor Segment Overrun",
-	"Bad TSS",
-	"Segment Not Present",
-	"Stack Fault",
-	"General Protection Fault",
-	"Page Fault",
-	"(Unknown Interrupt)",
-	"Coprocessor Fault",
-	"Alignment Check",
-	"Machine Check",
-	"SIMD Floating-Point Exception",
-	"Virtualization Exception",
-	"Control Protection Exception",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Reserved"
-};
 
 void fault_handler(struct regs *r) 
 {

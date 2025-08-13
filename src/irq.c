@@ -1,4 +1,4 @@
-#include "kernel.h"
+#include "../include/kernel.h"
 
 void outportb (unsigned short _port, unsigned char _data)
 {
@@ -40,21 +40,21 @@ void irq_uninstall_handler(int irq)
 
 void irq_remap(void)
 {
-	outportb(0x20, 0x11); // Start the initialization sequence
-	outportb(0xA0, 0x11); // Start the initialization sequence for the slave
-	outportb(0x21, 0x20); // Set the offset for the master PIC
-	outportb(0xA1, 0x28); // Set the offset for the slave PIC
-	outportb(0x21, 0x04); // Tell the master PIC that there is a slave PIC at IRQ2
-	outportb(0xA1, 0x02); // Tell the slave PIC its cascade identity
-	outportb(0x21, 0x01); // Set the master PIC to 8086/88 mode
-	outportb(0xA1, 0x01); // Set the slave PIC to 8086/88 mode
-	outportb(0x21, 0x00); // Unmask all IRQs on the master PIC
-	outportb(0xA1, 0x00); // Unmask all IRQs on the slave PIC
+	outportb(0x20, 0x11);
+	outportb(0xA0, 0x11);
+	outportb(0x21, 0x20);
+	outportb(0xA1, 0x28);
+	outportb(0x21, 0x04);
+	outportb(0xA1, 0x02);
+	outportb(0x21, 0x01);
+	outportb(0xA1, 0x01);
+	outportb(0x21, 0x00);
+	outportb(0xA1, 0x00);
 }
 
 void irq_install()
 {
-	irq_remap(); // Remap the IRQs
+	irq_remap();
 	idt_set_gate(32, (unsigned)irq0, 0x08, 0x8E);
 	idt_set_gate(33, (unsigned)irq1, 0x08, 0x8E);
 	idt_set_gate(34, (unsigned)irq2, 0x08, 0x8E);
@@ -82,12 +82,9 @@ void irq_handler(struct regs* r)
 	{
 		handler(r);
 	}
-
 	if (r->int_no >= 40) 
 	{
-		// Send an EOI to the slave PIC
 		outportb(0xA0, 0x20);
 	}
-
-	outportb(0x20, 0x20); // Send an EOI to the master PIC
+	outportb(0x20, 0x20);
 }
