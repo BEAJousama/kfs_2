@@ -1,10 +1,14 @@
 #include "../include/kernel.h"
 
+#define SCROLL_BUFFER_SIZE (VGA_HEIGHT * 250) // Buffer 250 times screen height
+
 typedef struct {
     size_t row;
     size_t column;
     uint8_t color;
-    uint16_t buffer[VGA_HEIGHT * VGA_WIDTH];
+    uint16_t buffer[SCROLL_BUFFER_SIZE * VGA_WIDTH]; // Larger buffer for scrolling
+    int scroll_offset; // Current scroll position (0 = bottom, positive = scrolled up)
+    size_t total_lines;   // Total lines written to buffer
 } screen_t;
 
 static screen_t screens[MAX_SCREENS];
@@ -36,26 +40,104 @@ void scroll_screen(int screen_id)
 {
     screen_t* screen = &screens[screen_id];
     
-    for (size_t i = 0; i < (VGA_HEIGHT - 1) * VGA_WIDTH; i++)
+    // Move all lines up in the buffer
+    for (size_t i = 0; i < (SCROLL_BUFFER_SIZE - 1) * VGA_WIDTH; i++)
     {
         screen->buffer[i] = screen->buffer[i + VGA_WIDTH];
     }
     
-    for (size_t i = (VGA_HEIGHT - 1) * VGA_WIDTH; i < VGA_HEIGHT * VGA_WIDTH; i++)
+    // Clear the last line
+    for (size_t i = (SCROLL_BUFFER_SIZE - 1) * VGA_WIDTH; i < SCROLL_BUFFER_SIZE * VGA_WIDTH; i++)
     {
         screen->buffer[i] = vga_entry(' ', screen->color);
     }
     
-    screen->row = VGA_HEIGHT - 1;
+    // Update total lines count
+    if (screen->total_lines < SCROLL_BUFFER_SIZE) {
+        screen->total_lines++;
+    }
+    
+    // Adjust scroll offset if we're not at the bottom
+    if (screen->scroll_offset > 0) {
+        screen->scroll_offset--;
+    }
+    
+    screen->row = (screen->total_lines < VGA_HEIGHT) ? screen->total_lines - 1 : VGA_HEIGHT - 1;
 }
 
 void refresh_display(void)
 {
+    screen_t* screen = &screens[current_screen];
+    
+    // Calculate which part of the buffer to display
+    int display_start_line;
+    if (screen->total_lines <= VGA_HEIGHT) {
+        // Not enough content to scroll, show from beginning
+        display_start_line = 0;
+    } else {
+        // Show the appropriate section based on scroll offset
+        display_start_line = screen->total_lines - VGA_HEIGHT - screen->scroll_offset;
+        if (display_start_line < 0) display_start_line = 0;
+        if (display_start_line > SCROLL_BUFFER_SIZE - VGA_HEIGHT) {
+            display_start_line = SCROLL_BUFFER_SIZE - VGA_HEIGHT;
+        }
+    }
+    
+    // Copy the visible portion to VGA buffer
     for (size_t i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++)
     {
-        vga_buffer[i] = screens[current_screen].buffer[i];
+        size_t buffer_index = display_start_line * VGA_WIDTH + i;
+        if (buffer_index < SCROLL_BUFFER_SIZE * VGA_WIDTH) {
+            vga_buffer[i] = screen->buffer[buffer_index];
+        } else {
+            vga_buffer[i] = vga_entry(' ', screen->color);
+        }
     }
-    update_cursor(screens[current_screen].row, screens[current_screen].column);
+    
+    // Update cursor position relative to displayed area
+    size_t cursor_row, cursor_col;
+    if (screen->scroll_offset == 0) {
+        // At bottom, show actual cursor position
+        cursor_row = screen->row - display_start_line;
+        cursor_col = screen->column;
+        if (cursor_row >= VGA_HEIGHT) {
+            cursor_row = VGA_HEIGHT - 1;
+        }
+    } else {
+        // Scrolled up, hide cursor
+        cursor_row = VGA_HEIGHT;
+        cursor_col = 0;
+    }
+    
+    update_cursor(cursor_row, cursor_col);
+}
+
+void terminal_scroll_up(void)
+{
+    screen_t* screen = &screens[current_screen];
+    
+    // Can only scroll up if we have more content than screen height
+    if (screen->total_lines > VGA_HEIGHT) {
+        int max_scroll = screen->total_lines - VGA_HEIGHT;
+        if (max_scroll > SCROLL_BUFFER_SIZE - VGA_HEIGHT) {
+            max_scroll = SCROLL_BUFFER_SIZE - VGA_HEIGHT;
+        }
+        
+        if (screen->scroll_offset < max_scroll) {
+            screen->scroll_offset++;
+            refresh_display();
+        }
+    }
+}
+
+void terminal_scroll_down(void)
+{
+    screen_t* screen = &screens[current_screen];
+    
+    if (screen->scroll_offset > 0) {
+        screen->scroll_offset--;
+        refresh_display();
+    }
 }
 
 void terminal_init_multiscreen(int requested_screens)
@@ -67,6 +149,8 @@ void terminal_init_multiscreen(int requested_screens)
     {
         screens[s].row = 0;
         screens[s].column = 0;
+        screens[s].scroll_offset = 0;
+        screens[s].total_lines = 0;
 
         switch (s)
         {
@@ -86,7 +170,7 @@ void terminal_init_multiscreen(int requested_screens)
                 screens[s].color = vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
                 break;
         }
-        for (size_t i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++)
+        for (size_t i = 0; i < SCROLL_BUFFER_SIZE * VGA_WIDTH; i++)
         {
             screens[s].buffer[i] = vga_entry(' ', screens[s].color);
         }
@@ -178,12 +262,20 @@ void terminal_putchar_screen(int screen_id, char c)
             screen->row++;
         }
     }
-    if (screen->row >= VGA_HEIGHT)
+    
+    // Check if we need to scroll
+    if (screen->row >= SCROLL_BUFFER_SIZE)
     {
         scroll_screen(screen_id);
     }
-    if (screen_id == current_screen)
+    else if (screen->row >= screen->total_lines)
     {
+        screen->total_lines = screen->row + 1;
+    }
+    
+    // Auto-scroll to bottom when new content is added
+    if (screen_id == current_screen) {
+        screen->scroll_offset = 0; // Reset to bottom
         refresh_display();
     }
 }
@@ -192,6 +284,28 @@ void terminal_writestring_screen(int screen_id, const char* data)
 {
     for (size_t i = 0; data[i]; i++) {
         terminal_putchar_screen(screen_id, data[i]);
+    }
+}
+
+void terminal_clear(void) {
+    terminal_clear_screen(current_screen);
+}
+
+void terminal_clear_screen(int screen_id) {
+    if (screen_id < 0 || screen_id >= num_screens) return;
+    
+    screen_t* screen = &screens[screen_id];
+    screen->row = 0;
+    screen->column = 0;
+    screen->scroll_offset = 0;
+    screen->total_lines = 0;
+    
+    for (size_t i = 0; i < SCROLL_BUFFER_SIZE * VGA_WIDTH; i++) {
+        screen->buffer[i] = vga_entry(' ', screen->color);
+    }
+    
+    if (screen_id == current_screen) {
+        refresh_display();
     }
 }
 
@@ -205,6 +319,7 @@ void init_terminal(void)
     for (int i = 0; i < 4; i++)
     {
         kprintf_screen(i, "Screen %d: Use SHIFT + ALT + { -> , <- } to switch screens\n", i);
+        kprintf_screen(i, "Screen %d: Use UP/DOWN arrows to scroll\n", i);
         kprintf_screen(i, "Screen %d: Type to test keyboard input\n", i);
     }
     terminal_switch_screen(0);

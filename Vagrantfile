@@ -6,7 +6,7 @@ Vagrant.configure("2") do |config|
   
   config.vm.provider "virtualbox" do |vb|
     vb.gui = true
-    vb.name = "KFS-VM"
+    vb.name = "KFS2-VM"
     vb.memory = "4096"
     vb.cpus = 3
     vb.customize ["modifyvm", :id, "--accelerate3d", "on"]

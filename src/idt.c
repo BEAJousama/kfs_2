@@ -1,8 +1,8 @@
 #include "../include/kernel.h"
 
 struct idt_entry {
-	unsigned short base_lo;
-	unsigned short sel;
+	unsigned short base_lo; // Lower 16 bits of the address to jump to when this interrupt fires
+	unsigned short sel; // The selector in the GDT or LDT that this IDT entry will use to find the code segment
 	unsigned char always0;
 	unsigned char flags;
 	unsigned short base_hi;

@@ -11,5 +11,6 @@
 #include "isr.h"
 #include "gdt.h"
 #include "idt.h"
+#include "shell.h"
 
 #endif

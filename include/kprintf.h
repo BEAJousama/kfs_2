@@ -13,5 +13,6 @@ int uint_to_string(unsigned int num, char* str, int base);
 int kvprintf(void (*putc)(char), const char* fmt, va_list ap);
 int kvprintf_screen(int screen_id, const char* fmt, va_list ap);
 int kprintf_screen(int screen_id, const char* fmt, ...);
+int kprintf(const char* fmt, ...);
 
 #endif

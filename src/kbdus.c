@@ -71,27 +71,33 @@ static void handle_screen_switch_arrows(unsigned char scancode)
     }
 }
 
-void keyboard_handler(struct regs *r)
-{
-    (void)r;
+
+void keyboard_handler(struct regs *r) {
+    (void)r; // Suppress unused parameter warning
     
     unsigned char scancode = inb(0x60);
-
+    
+    // Handle extended scancode prefix (0xE0)
     if (scancode == 0xE0) {
         extended_scancode = true;
         return;
     }
-    if (scancode & 0x80)
-    {
-        scancode &= 0x7F;
+    
+    // Uncomment this line for debugging scancodes:
+    // debug_scancode(scancode);
+    
+    // Handle key releases (bit 7 set)
+    if (scancode & 0x80) {
+        scancode &= 0x7F; // Remove release bit
         
-        if (extended_scancode)
-        {
+        // Handle extended key releases
+        if (extended_scancode) {
             extended_scancode = false;
+            // Arrow keys released - no action needed
             return;
         }
-        switch (scancode)
-        {
+        
+        switch (scancode) {
             case SC_CTRL:
                 ctrl_pressed = false;
                 break;
@@ -106,14 +112,13 @@ void keyboard_handler(struct regs *r)
         return;
     }
     
-    if (extended_scancode)
-    {
+    // Handle extended keys (arrow keys, etc.)
+    if (extended_scancode) {
         extended_scancode = false;
         
-        if (alt_pressed)
-        {
-            switch (scancode)
-            {
+        // Check for screen switching with Alt+Arrow keys
+        if (alt_pressed) {
+            switch (scancode) {
                 case SC_LEFT_ARROW:
                 case SC_RIGHT_ARROW:
                 case SC_UP_ARROW:
@@ -122,11 +127,25 @@ void keyboard_handler(struct regs *r)
                     return;
             }
         }
+        
+        // Handle scrolling with arrow keys (when not switching screens)
+        if (!alt_pressed) {
+            switch (scancode) {
+                case SC_UP_ARROW:
+                    terminal_scroll_up();
+                    return;
+                case SC_DOWN_ARROW:
+                    terminal_scroll_down();
+                    return;
+            }
+        }
+        
+        // Handle other extended keys here if needed
         return;
     }
     
-    switch (scancode)
-    {
+    // Handle regular key presses
+    switch (scancode) {
         case SC_CTRL:
             ctrl_pressed = true;
             return;
@@ -137,22 +156,30 @@ void keyboard_handler(struct regs *r)
         case SC_SHIFT_R:
             shift_pressed = true;
             return;
+        case SC_ESC:
+            // Toggle shell on ESC key
+            shell_toggle();
+            return;
     }
-    if (scancode < 128)
-    {
+    
+    // Handle regular character input
+    if (scancode < 128) {
         char c = 0;
-
-        if (shift_pressed)
-        {
+        
+        // Get the character from the appropriate table
+        if (shift_pressed) {
             c = kbdus_shift[scancode];
-        }
-        else
-        {
+        } else {
             c = kbdus[scancode];
         }
-        if (c != 0)
-        {
-            terminal_putchar(c);
+        
+        // Send to shell if active, otherwise to terminal
+        if (c != 0) {
+            if (is_shell_active()) {
+                shell_handle_key(c);
+            } else {
+                terminal_putchar(c);
+            }
         }
     }
 }
@@ -162,4 +189,3 @@ void keyboard_install()
     clear_keyboard_buffer();
     irq_install_handler(1, keyboard_handler);
 }
-

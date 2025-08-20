@@ -256,6 +256,14 @@ int kvprintf_screen(int screen_id, const char* fmt, va_list ap)
     return result;
 }
 
+int kprintf(const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int written = kvprintf(kputchar, fmt, ap);
+    va_end(ap);
+    return written;
+}
+
 int kprintf_screen(int screen_id, const char* fmt, ...)
 {
     va_list ap;

@@ -1,8 +1,8 @@
 # === File paths ===
-KERNEL_SRC = src/kernel.c src/helpers.c src/terminal.c src/kprintf.c src/gdt.c src/idt.c src/irq.c src/isrs.c src/kbdus.c
+KERNEL_SRC = src/kernel.c src/helpers.c src/terminal.c src/kprintf.c src/gdt.c src/idt.c src/irq.c src/isrs.c src/kbdus.c src/shell.c
 
 # === Build paths ===
-KERNEL_OBJ = build/kernel.o build/helpers.o build/terminal.o build/kprintf.o build/gdt.o build/idt.o build/irq.o build/isrs.o build/kbdus.o
+KERNEL_OBJ = build/kernel.o build/helpers.o build/terminal.o build/kprintf.o build/gdt.o build/idt.o build/irq.o build/isrs.o build/kbdus.o build/shell.o
 
 BOOT_SRC   = src/boot.s
 START_SRC  = src/start.asm

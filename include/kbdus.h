@@ -5,5 +5,7 @@
 
 void keyboard_handler(struct regs *r);
 void keyboard_install();
+void shell_toggle();
+
 
 #endif

@@ -24,6 +24,7 @@
 #define SC_DOWN_ARROW 0x50
 #define SC_LEFT_ARROW 0x4B
 #define SC_RIGHT_ARROW 0x4D
+#define SC_ESC 0x01
 
 // VGA colors
 enum vga_color {

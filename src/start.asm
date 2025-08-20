@@ -6,16 +6,42 @@ idt_load:
     lidt [idtp]
     ret
 gdt_flush:
-    lgdt [gp]
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax
-    jmp 0x08:flush2
+    lgdt [gp]            ; Load the GDT
+
+    ; Load kernel segments
+    mov ax, 0x10         ; Kernel data segment selector (index 2)
+    mov ds, ax           ; Set DS to kernel data segment
+    mov es, ax           ; Set ES to kernel data segment
+    mov fs, ax           ; Set FS to kernel data segment
+    mov ss, ax           ; Set SS to kernel stack segment
+
+    mov ax, 0x18         ; Kernel stack segment selector (index 3)
+    mov gs, ax           ; Set GS to kernel stack segment
+
+    jmp 0x08:flush2      ; Far jump to reload CS with kernel code segment (index 1)
 flush2:
     ret
+
+switch_to_user_mode:
+    ; Load user data and stack segments
+    mov ax, 0x28         ; User data segment selector (index 5)
+    mov ds, ax           ; Set DS to user data segment
+    mov es, ax           ; Set ES to user data segment
+    mov fs, ax           ; Set FS to user data segment
+    mov gs, ax           ; Set GS to user data segment
+    mov ax, 0x30         ; User stack segment selector (index 6)
+    mov ss, ax           ; Set SS to user stack segment
+
+    ; Load user code segment with a far jump
+    push 0x20            ; User code segment selector (index 4)
+    push user_mode_entry ; Address of user mode entry point
+    retf                 ; Far return to switch to user mode
+
+user_mode_entry:
+    ; User mode code starts here
+    ; Ensure interrupts are enabled if needed
+    hlt                  ; Halt the CPU (for demonstration)
+
 global isr0
 global isr1
 global isr2

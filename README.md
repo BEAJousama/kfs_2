@@ -1,4 +1,4 @@
-# kfs_2
+# kfs_1
 
 
 # Fundamentals:
@@ -27,6 +27,8 @@ Here's a more detailed breakdown:
         The BIOS/UEFI loads the bootloader from the boot device. The bootloader, a small program, then loads the main part of the operating system into the computer's memory (RAM).
     5. System Configuration and User Login:
         Once the operating system is loaded, it performs further system configuration tasks, such as loading drivers for devices and starting necessary services. Finally, the user is presented with a login screen to access their user account.
+
+![Boot Process Diagram](assets/boot.png)
 
 ## Bootloader:
 
@@ -101,23 +103,34 @@ Triggered by programs using special CPU instructions (e.g., int 0x80 in Linux sy
 - CPU exceptions
 Triggered when the CPU detects an error: divide by zero, invalid instruction, page fault, general protection fault.
 
-# To DO:
+# IRQ:
 
-vagrantfile
-gcc_cross
-makefile
+Interrupt Requests:
 
-linker
-boot.s
-grub.cfg
+- IRQs are interrupts that are raised by hardware devices.
+- When a device signals an IRQ, remember that an interrupt is generated, and the CPU pauses whatever it's doing to call the ISR to handle the corresponding IRQ.The CPU then performs whatever necessary action (like reading from the keyboard, for example), and then it must tell the PIC that the interrupt came from that the CPU has finished executing the correct routine. 
+- CPU tells the right PIC that the interrupt is complete by writing the command byte 0x20 in hex to the command register for that PIC.
+- The master PIC's command register exists at I/O port 0x20, while the slave PIC's command register exists at I/O port 0xA0.
 
+## Programmable Interrupt Controllers or PICs:
 
-terminal.c
-kprintf.c
+Each PIC can handle 8 IRQs
 
-gdt.c
-idt.c
-isrs.c
-irq.c
-kbdus.c
-start.asm
+- 'Master' IRQ controller
+The master IRQ controller is connected directly to the processor itself, to send signals.
+The master PIC handles IRQs 0 to 7.
+
+- 'Slave' IRQ controller
+The slave is connected to IRQ2 on the master controller. 
+The slave PIC handles IRQs 8 to 15.
+
+# KBD:
+
+A keyboard is the most common way for a user to give a computer input
+
+- The keyboard is attached to the computer through a special microcontroller chip on your mainboard.
+- This keyboard controller chip has 2 channels: one for the keyboard, and one for the mouse.
+- The keyboard controller, being a device accessible by the system, has an address on the I/O bus that we can use for access and control.
+- The keyboard controller has 2 main registers: a Data register at 0x60, and a Control register at 0x64.
+- Anything that the keyboard wants to send the computer is stored into the Data register.
+- The keyboard will raise IRQ1 whenever it has data for us to read.
