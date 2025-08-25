@@ -268,7 +268,7 @@ void init_terminal(void)
     kprintf_screen(3, "Screen 3: Hello World %d!!!!\n", 42);
     for (int i = 0; i < 4; i++)
     {
-        kprintf_screen(i, "Screen %d: Use SHIFT + ALT + { -> , <- } to switch screens\n", i);
+        kprintf_screen(i, "Screen %d: Use ALT + { -> , <- } to switch screens\n", i);
         kprintf_screen(i, "Screen %d: Use UP/DOWN arrows to scroll\n", i);
         kprintf_screen(i, "Screen %d: Type to test keyboard input\n", i);
     }
