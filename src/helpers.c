@@ -17,7 +17,7 @@ char* strcpy(char* dest, const char* src)
     {
         *dest++ = *src++;
     }
-    *dest = '\0'; // Null-terminate the destination string
+    *dest = '\0'; 
     return original_dest;
 }
 
@@ -54,7 +54,7 @@ void* memset(void* s, int c, size_t n)
     return s;
 }
 
-// strncmp compares at most n characters of two strings
+
 int strncmp(const char* str1, const char* str2, size_t n)
 {
     while (n && *str1 && (*str1 == *str2))
@@ -64,11 +64,9 @@ int strncmp(const char* str1, const char* str2, size_t n)
         n--;
     }
     
-    if (n == 0) return 0; // If n characters are equal, return 0
+    if (n == 0) return 0;
     return *(const unsigned char*)str1 - *(const unsigned char*)str2;
 }
-
-// strncpy
 
 char* strncpy(char* dest, const char* src, size_t n)
 {
@@ -78,8 +76,6 @@ char* strncpy(char* dest, const char* src, size_t n)
     {
         *dest++ = *src++;
     }
-    
-    // Null-terminate if we reached the end of src before n reached 0
     while (n-- > 0)
     {
         *dest++ = '\0';

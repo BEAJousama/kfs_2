@@ -1,6 +1,6 @@
 #include "../include/kernel.h"
 
-static int default_print_screen = -1; // -1 means use current active screen
+static int default_print_screen = -1;
 
 void kputchar(char c)
 {

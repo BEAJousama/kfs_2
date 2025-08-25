@@ -1,14 +1,14 @@
 #include "../include/kernel.h"
 
-#define SCROLL_BUFFER_SIZE (VGA_HEIGHT * 250) // Buffer 250 times screen height
+#define SCROLL_BUFFER_SIZE (VGA_HEIGHT * 250)
 
 typedef struct {
     size_t row;
     size_t column;
     uint8_t color;
-    uint16_t buffer[SCROLL_BUFFER_SIZE * VGA_WIDTH]; // Larger buffer for scrolling
-    int scroll_offset; // Current scroll position (0 = bottom, positive = scrolled up)
-    size_t total_lines;   // Total lines written to buffer
+    uint16_t buffer[SCROLL_BUFFER_SIZE * VGA_WIDTH];
+    int scroll_offset;
+    size_t total_lines;
 } screen_t;
 
 static screen_t screens[MAX_SCREENS];
@@ -36,46 +36,14 @@ void update_cursor(size_t row, size_t col)
     outb(0x3D5, (uint8_t) (pos & 0xFF));
 }
 
-void scroll_screen(int screen_id)
-{
-    screen_t* screen = &screens[screen_id];
-    
-    // Move all lines up in the buffer
-    for (size_t i = 0; i < (SCROLL_BUFFER_SIZE - 1) * VGA_WIDTH; i++)
-    {
-        screen->buffer[i] = screen->buffer[i + VGA_WIDTH];
-    }
-    
-    // Clear the last line
-    for (size_t i = (SCROLL_BUFFER_SIZE - 1) * VGA_WIDTH; i < SCROLL_BUFFER_SIZE * VGA_WIDTH; i++)
-    {
-        screen->buffer[i] = vga_entry(' ', screen->color);
-    }
-    
-    // Update total lines count
-    if (screen->total_lines < SCROLL_BUFFER_SIZE) {
-        screen->total_lines++;
-    }
-    
-    // Adjust scroll offset if we're not at the bottom
-    if (screen->scroll_offset > 0) {
-        screen->scroll_offset--;
-    }
-    
-    screen->row = (screen->total_lines < VGA_HEIGHT) ? screen->total_lines - 1 : VGA_HEIGHT - 1;
-}
-
 void refresh_display(void)
 {
     screen_t* screen = &screens[current_screen];
     
-    // Calculate which part of the buffer to display
     int display_start_line;
     if (screen->total_lines <= VGA_HEIGHT) {
-        // Not enough content to scroll, show from beginning
         display_start_line = 0;
     } else {
-        // Show the appropriate section based on scroll offset
         display_start_line = screen->total_lines - VGA_HEIGHT - screen->scroll_offset;
         if (display_start_line < 0) display_start_line = 0;
         if (display_start_line > SCROLL_BUFFER_SIZE - VGA_HEIGHT) {
@@ -83,7 +51,6 @@ void refresh_display(void)
         }
     }
     
-    // Copy the visible portion to VGA buffer
     for (size_t i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++)
     {
         size_t buffer_index = display_start_line * VGA_WIDTH + i;
@@ -94,17 +61,14 @@ void refresh_display(void)
         }
     }
     
-    // Update cursor position relative to displayed area
     size_t cursor_row, cursor_col;
     if (screen->scroll_offset == 0) {
-        // At bottom, show actual cursor position
         cursor_row = screen->row - display_start_line;
         cursor_col = screen->column;
         if (cursor_row >= VGA_HEIGHT) {
             cursor_row = VGA_HEIGHT - 1;
         }
     } else {
-        // Scrolled up, hide cursor
         cursor_row = VGA_HEIGHT;
         cursor_col = 0;
     }
@@ -116,7 +80,6 @@ void terminal_scroll_up(void)
 {
     screen_t* screen = &screens[current_screen];
     
-    // Can only scroll up if we have more content than screen height
     if (screen->total_lines > VGA_HEIGHT) {
         int max_scroll = screen->total_lines - VGA_HEIGHT;
         if (max_scroll > SCROLL_BUFFER_SIZE - VGA_HEIGHT) {
@@ -263,27 +226,14 @@ void terminal_putchar_screen(int screen_id, char c)
         }
     }
     
-    // Check if we need to scroll
-    if (screen->row >= SCROLL_BUFFER_SIZE)
-    {
-        scroll_screen(screen_id);
-    }
-    else if (screen->row >= screen->total_lines)
+   if (screen->row >= screen->total_lines)
     {
         screen->total_lines = screen->row + 1;
     }
     
-    // Auto-scroll to bottom when new content is added
     if (screen_id == current_screen) {
-        screen->scroll_offset = 0; // Reset to bottom
+        screen->scroll_offset = 0;
         refresh_display();
-    }
-}
-
-void terminal_writestring_screen(int screen_id, const char* data)
-{
-    for (size_t i = 0; data[i]; i++) {
-        terminal_putchar_screen(screen_id, data[i]);
     }
 }
 

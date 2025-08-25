@@ -5,7 +5,6 @@
 #define MAX_COMMAND_LENGTH 256
 #define MAX_ARGS 16
 
-// Command structure
 typedef struct {
     char *name;
     char *description;
@@ -18,13 +17,7 @@ typedef struct {
     uint8_t second;
 } time_t;
 
-// Command buffer
 
-
-// Command history (simple)
-// static char last_command[MAX_COMMAND_LENGTH];
-
-// Shell command functions
 void cmd_help(int argc, char **argv);
 void cmd_stack(int argc, char **argv);
 void cmd_gdt(int argc, char **argv);
@@ -42,7 +35,6 @@ bool is_shell_active(void);
 void handle_tab_completion();
 void clear_command_line(void);
 int find_matching_commands(const char* partial, char matches[][32], int max_matches);
-void add_to_history(const char* command);
 int parse_command(char *input, char **argv, int max_args);
 
 #endif
