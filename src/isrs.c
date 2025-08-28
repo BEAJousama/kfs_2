@@ -1,13 +1,5 @@
 #include "../include/kernel.h"
 
-void kputs(const char* str)
-{
-    for (size_t i = 0; str[i]; i++)
-    {
-        kputchar(str[i]);
-    }
-}
-
 const char *exception_messages[] = {
 	"Division By Zero",
 	"Debug",

@@ -14,6 +14,14 @@ void kputchar(char c)
     }
 }
 
+void kputs(const char* str)
+{
+    for (size_t i = 0; str[i]; i++)
+    {
+        kputchar(str[i]);
+    }
+}
+
 void reverse_string(char* str, int length)
 {
     int start = 0;
@@ -247,15 +255,6 @@ int kvprintf(void (*putc)(char), const char* fmt, va_list ap)
     return count;
 }
 
-int kvprintf_screen(int screen_id, const char* fmt, va_list ap)
-{
-    int old_screen = default_print_screen;
-    default_print_screen = screen_id;
-    int result = kvprintf(kputchar, fmt, ap);
-    default_print_screen = old_screen;
-    return result;
-}
-
 int kprintf(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -267,8 +266,16 @@ int kprintf(const char* fmt, ...) {
 int kprintf_screen(int screen_id, const char* fmt, ...)
 {
     va_list ap;
+    int old_screen;
+    int result;
+
     va_start(ap, fmt);
-    int written = kvprintf_screen(screen_id, fmt, ap);
+
+    old_screen = default_print_screen;
+    default_print_screen = screen_id;
+    result = kvprintf(kputchar, fmt, ap);
+    default_print_screen = old_screen;
+    
     va_end(ap);
-    return written;
+    return result;
 }

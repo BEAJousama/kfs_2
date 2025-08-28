@@ -1,9 +1,5 @@
 #include "../include/kernel.h"
 
-void outportb (unsigned short _port, unsigned char _data)
-{
-    __asm__ __volatile__ ("outb %1, %0" : : "dN" (_port), "a" (_data));
-}
 
 extern void irq0();
 extern void irq1();
@@ -40,16 +36,16 @@ void irq_uninstall_handler(int irq)
 
 void irq_remap(void)
 {
-	outportb(0x20, 0x11);
-	outportb(0xA0, 0x11);
-	outportb(0x21, 0x20);
-	outportb(0xA1, 0x28);
-	outportb(0x21, 0x04);
-	outportb(0xA1, 0x02);
-	outportb(0x21, 0x01);
-	outportb(0xA1, 0x01);
-	outportb(0x21, 0x00);
-	outportb(0xA1, 0x00);
+	outb(0x20, 0x11);
+	outb(0xA0, 0x11);
+	outb(0x21, 0x20);
+	outb(0xA1, 0x28);
+	outb(0x21, 0x04);
+	outb(0xA1, 0x02);
+	outb(0x21, 0x01);
+	outb(0xA1, 0x01);
+	outb(0x21, 0x00);
+	outb(0xA1, 0x00);
 }
 
 void irq_install()
@@ -84,7 +80,7 @@ void irq_handler(struct regs* r)
 	}
 	if (r->int_no >= 40) 
 	{
-		outportb(0xA0, 0x20);
+		outb(0xA0, 0x20);
 	}
-	outportb(0x20, 0x20);
+	outb(0x20, 0x20);
 }
