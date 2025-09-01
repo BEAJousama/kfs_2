@@ -33,7 +33,6 @@ void cmd_shutdown(int argc, char **argv);
 void shell_toggle(void);
 bool is_shell_active(void);
 void handle_tab_completion();
-void clear_command_line(void);
 int find_matching_commands(const char* partial, char matches[][32], int max_matches);
 int parse_command(char *input, char **argv, int max_args);
 

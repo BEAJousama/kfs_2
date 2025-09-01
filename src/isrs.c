@@ -31,6 +31,7 @@ const char *exception_messages[] = {
 	"Reserved",
 	"Reserved",
 	"Reserved",
+	"Reserved",
 	"Reserved"
 };
 

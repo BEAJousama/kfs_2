@@ -1,15 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   shell.c                                            :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: obeaj <obeaj@student.42.fr>                +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/08/22 17:55:17 by obeaj             #+#    #+#             */
-/*   Updated: 2025/08/25 05:30:53 by obeaj            ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include "../include/kernel.h"
 
 static char command_buffer[MAX_COMMAND_LENGTH];
@@ -173,18 +161,6 @@ int find_matching_commands(const char* partial, char matches[][32], int max_matc
     return count;
 }
 
-void clear_command_line(void) {
-    for (int i = 0; i < command_pos; i++) {
-        terminal_putchar('\b'); 
-    }
-    for (int i = 0; i < command_pos; i++) {
-        terminal_putchar(' ');
-    }
-    for (int i = 0; i < command_pos; i++) {
-        terminal_putchar('\b');
-    }
-}
-
 void handle_tab_completion() {
     char matches[16][32];
     int match_count;
@@ -285,63 +261,51 @@ void handle_tab_completion() {
 
 void shell_handle_key(char c) {
     static int escape_state = 0;
+
+    if (c == 27) {
+        escape_state = 1;
+        return;
+    }
     
-    switch (escape_state) {
-        case 0:
-            if (c == 27) {
-                escape_state = 1;
-                return;
+    switch (c) {
+        case '\n':
+        case '\r':
+            kprintf("\n");
+            
+            if (command_pos >= MAX_COMMAND_LENGTH) command_pos = MAX_COMMAND_LENGTH - 1;
+            command_buffer[command_pos] = '\0';
+            
+            if (command_pos > 0) {
+                execute_command(command_buffer);
             }
             
-            switch (c) {
-                case '\n':
-                case '\r':
-                    kprintf("\n");
-                    
-                    if (command_pos >= MAX_COMMAND_LENGTH) command_pos = MAX_COMMAND_LENGTH - 1;
-                    command_buffer[command_pos] = '\0';
-                    
-                    if (command_pos > 0) {
-                        execute_command(command_buffer);
-                    }
-                    
-                    command_pos = 0;
-                    command_buffer[0] = '\0';
-                    shell_prompt();
-                    break;
-                    
-                case '\b':
-                case 127:
-                    if (command_pos > 0) {
-                        command_pos--;
-                        command_buffer[command_pos] = '\0';
-                        terminal_putchar('\b');
-                    }
-                    break;
-                    
-                case '\t':
-                    handle_tab_completion();
-                    break;         
-                default:
-                    if (command_pos < MAX_COMMAND_LENGTH - 1 && c >= 32 && c <= 126) {
-                        command_buffer[command_pos] = c;
-                        command_pos++;
-                        command_buffer[command_pos] = '\0';
-                        terminal_putchar(c);
-                    }
-                    break;
+            command_pos = 0;
+            command_buffer[0] = '\0';
+            shell_prompt();
+            break;
+            
+        case '\b':
+        case 127:
+            if (command_pos > 0) {
+                command_pos--;
+                command_buffer[command_pos] = '\0';
+                terminal_putchar('\b');
             }
             break;
             
-        case 1:
-            if (c == '[') {
-                escape_state = 2;
-                return;
-            }
-            escape_state = 0;
-            shell_handle_key(c);
+        case '\t':
+            handle_tab_completion();
             break;         
+        default:
+            if (command_pos < MAX_COMMAND_LENGTH - 1 && c >= 32 && c <= 126) {
+                command_buffer[command_pos] = c;
+                command_pos++;
+                command_buffer[command_pos] = '\0';
+                terminal_putchar(c);
+            }
+            break;
     }
+
 }
 
 void shell_prompt(void) {
@@ -369,7 +333,6 @@ void shell_toggle(void) {
         shell_prompt();
     } else {
         kprintf("\n[Shell deactivated]\n");
-        kprintf("$ ");
     }
 }
 
