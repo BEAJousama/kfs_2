@@ -104,12 +104,18 @@ void isrs_install()
 	idt_set_gate(31, (unsigned)isr31, 0x08, 0x8E);
 }
 
-void fault_handler(struct regs *r) 
+void fault_handler(struct regs *r)
 {
-	if (r->int_no < 32)
+	if (r->int_no >= 32)
+		return;
+
+	/* Breakpoint (#BP) and Debug (#DB) are recoverable: report and resume. */
+	if (r->int_no == 1 || r->int_no == 3)
 	{
-		kputs(exception_messages[r->int_no]);
-		kputs(" EXCEPTION . System Halted.\n");
-		for (;;);
+		panic_nonfatal("CPU trap #%d (%s) at eip=0x%08X",
+			r->int_no, exception_messages[r->int_no], r->eip);
+		return;
 	}
+
+	panic_from_regs(r);
 }

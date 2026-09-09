@@ -4,14 +4,22 @@ static char command_buffer[MAX_COMMAND_LENGTH];
 static int command_pos = 0;
 
 shell_command_t commands[] = {
-    {"help", "Display this help message", cmd_help},
-    {"stack", "Print kernel stack information", cmd_stack},
-    {"gdt", "Display GDT information", cmd_gdt},
-    {"clear", "Clear the screen", cmd_clear},
-    {"echo", "Echo arguments", cmd_echo},
-    {"time", "Show system uptime", cmd_time},
-    {"reboot", "Reboot the system", cmd_reboot},
-    {"halt", "Halt the system", cmd_halt},
+    {"help",   "Show this help message",                  cmd_help},
+    {"clear",  "Clear the screen",                        cmd_clear},
+    {"echo",   "Echo the arguments",                      cmd_echo},
+    {"gdt",    "Dump the Global Descriptor Table",        cmd_gdt},
+    {"stack",  "Hex dump of the kernel stack (gdb style)", cmd_stack},
+    {"regs",   "Dump CPU / control registers",            cmd_regs},
+    {"eflags", "Decode the EFLAGS register",              cmd_eflags},
+    {"cpuid",  "Show CPU vendor and features",            cmd_cpuid},
+    {"mem",    "Hex dump memory: mem <addr> [words]",     cmd_mem},
+    {"uptime", "Time since boot (PIT ticks)",             cmd_uptime},
+    {"time",   "Show the wall-clock time (RTC)",          cmd_time},
+    {"fault",  "Trigger a CPU fault: fault <div0|bp|gp|ud>", cmd_fault},
+    {"panic",  "Trigger a test kernel panic",             cmd_panic},
+    {"colors", "Print the VGA colour palette",            cmd_colors},
+    {"reboot", "Reboot the machine",                      cmd_reboot},
+    {"halt",   "Halt the CPU",                            cmd_halt},
     {NULL, NULL, NULL}
 };
 
@@ -32,19 +40,20 @@ void read_rtc_time(uint8_t* hour, uint8_t* minute, uint8_t* second) {
     *hour   = bcd_to_bin(cmos_read(0x04));
 }
 
+#define SHCOL(fg) vga_color_entry((fg), VGA_COLOR_BLACK)
+
 void cmd_help(int argc, char **argv) {
     (void)argc; (void)argv;
-    
-    kprintf("Available commands:\n");
-    kprintf("==================\n");
-    
+
+    kprintf_color(SHCOL(VGA_COLOR_LIGHT_CYAN), "KFS_2 debug shell - commands\n");
     for (int i = 0; commands[i].name != NULL; i++) {
-        kprintf("%12s - %s\n", commands[i].name, commands[i].description);
+        kprintf_color(SHCOL(VGA_COLOR_LIGHT_GREEN), "  %-8s", commands[i].name);
+        kprintf_color(SHCOL(VGA_COLOR_LIGHT_GREY), " %s\n", commands[i].description);
     }
-    kprintf("\nShell features:\n");
-    kprintf("==============\n");
-    kprintf("      - Tab for command completion\n");
-    kprintf("      - Backspace for editing\n");
+    kprintf_color(SHCOL(VGA_COLOR_DARK_GREY),
+        "\n  TAB completes commands, BACKSPACE edits, ESC leaves the shell.\n"
+        "  ALT+Left/Right switch screens, Up/Down scroll the backlog.\n");
+    terminal_reset_color();
 }
 
 void cmd_stack(int argc, char **argv) {
@@ -55,6 +64,85 @@ void cmd_stack(int argc, char **argv) {
 void cmd_gdt(int argc, char **argv) {
     (void)argc; (void)argv;
     print_gdt_info();
+}
+
+void cmd_regs(int argc, char **argv) {
+    (void)argc; (void)argv;
+    print_registers();
+}
+
+void cmd_eflags(int argc, char **argv) {
+    (void)argc; (void)argv;
+    print_eflags();
+}
+
+void cmd_cpuid(int argc, char **argv) {
+    (void)argc; (void)argv;
+    print_cpuid();
+}
+
+void cmd_mem(int argc, char **argv) {
+    if (argc < 2) {
+        kprintf("usage: mem <addr> [words]\n");
+        kprintf("example: mem 0xB8000 16\n");
+        return;
+    }
+
+    uint32_t addr = (uint32_t)kstrtoul(argv[1], 0);
+    uint32_t words = (argc >= 3) ? (uint32_t)kstrtoul(argv[2], 0) : 16;
+
+    if (words > 256) words = 256;
+    dump_memory(addr, words);
+}
+
+void cmd_uptime(int argc, char **argv) {
+    (void)argc; (void)argv;
+
+    uint32_t sec, ms;
+    timer_uptime(&sec, &ms);
+    kprintf("up %u.%03u s  (%u ticks @ %u Hz)\n",
+            sec, ms, timer_get_ticks(), timer_get_hz());
+}
+
+void cmd_fault(int argc, char **argv) {
+    if (argc < 2) {
+        kprintf("usage: fault <div0|bp|gp|ud>\n");
+        return;
+    }
+
+    if (strcmp(argv[1], "div0") == 0) {
+        volatile int a = 1, b = 0;
+        volatile int c = a / b;
+        (void)c;
+    } else if (strcmp(argv[1], "bp") == 0) {
+        __asm__ volatile ("int $3");
+    } else if (strcmp(argv[1], "gp") == 0) {
+        __asm__ volatile ("mov $0x38, %ax; mov %ax, %ds"); /* selector past GDT limit */
+    } else if (strcmp(argv[1], "ud") == 0) {
+        __asm__ volatile ("ud2"); /* invalid opcode -> #UD */
+    } else {
+        kprintf("unknown fault type: %s\n", argv[1]);
+    }
+}
+
+void cmd_panic(int argc, char **argv) {
+    (void)argc;
+    panic("manual panic requested from shell (%s)", argv[0]);
+}
+
+void cmd_colors(int argc, char **argv) {
+    (void)argc; (void)argv;
+
+    static const char *names[16] = {
+        "black", "blue", "green", "cyan", "red", "magenta", "brown", "lgrey",
+        "dgrey", "lblue", "lgreen", "lcyan", "lred", "lmagenta", "yellow", "white"
+    };
+    for (int i = 0; i < 16; i++) {
+        kprintf_color(vga_color_entry((enum vga_color)i, VGA_COLOR_BLACK),
+                      " %2d %-9s", i, names[i]);
+        if (i % 4 == 3) kprintf("\n");
+    }
+    terminal_reset_color();
 }
 
 void cmd_clear(int argc, char **argv) {
@@ -260,13 +348,9 @@ void handle_tab_completion() {
 }
 
 void shell_handle_key(char c) {
-    static int escape_state = 0;
-
-    if (c == 27) {
-        escape_state = 1;
+    if (c == 27)  /* ESC is consumed by the scancode layer; ignore here */
         return;
-    }
-    
+
     switch (c) {
         case '\n':
         case '\r':

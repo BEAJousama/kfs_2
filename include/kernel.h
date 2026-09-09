@@ -11,6 +11,9 @@
 #include "isr.h"
 #include "gdt.h"
 #include "idt.h"
+#include "panic.h"
+#include "debug.h"
+#include "timer.h"
 #include "shell.h"
 
 #endif

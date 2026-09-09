@@ -6,6 +6,7 @@ typedef struct {
     size_t row;
     size_t column;
     uint8_t color;
+    uint8_t default_color;
     uint16_t buffer[SCROLL_BUFFER_SIZE * VGA_WIDTH];
     int scroll_offset;
     size_t total_lines;
@@ -16,9 +17,29 @@ static int current_screen = 0;
 static int num_screens = 1;
 static uint16_t* vga_buffer = (uint16_t*)VGA_MEMORY;
 
-static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) 
+static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg)
 {
 	return fg | bg << 4;
+}
+
+uint8_t vga_color_entry(enum vga_color fg, enum vga_color bg)
+{
+	return vga_entry_color(fg, bg);
+}
+
+void terminal_set_color(uint8_t color)
+{
+	screens[current_screen].color = color;
+}
+
+uint8_t terminal_get_color(void)
+{
+	return screens[current_screen].color;
+}
+
+void terminal_reset_color(void)
+{
+	screens[current_screen].color = screens[current_screen].default_color;
 }
 
 static inline uint16_t vga_entry(unsigned char uc, uint8_t color) 
@@ -133,6 +154,7 @@ void terminal_init_multiscreen(int requested_screens)
                 screens[s].color = vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
                 break;
         }
+        screens[s].default_color = screens[s].color;
         for (size_t i = 0; i < SCROLL_BUFFER_SIZE * VGA_WIDTH; i++)
         {
             screens[s].buffer[i] = vga_entry(' ', screens[s].color);

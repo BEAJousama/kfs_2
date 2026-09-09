@@ -31,12 +31,45 @@ void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned cha
 	gdt[num].access = access;
 }
 
-void print_gdt_info() 
+#define COL(fg)   vga_color_entry((fg), VGA_COLOR_BLACK)
+
+static const char *seg_type_str(int s, int type)
 {
-    kprintf("GDT Information:\n");
-    kprintf("---------------\n");
-    kprintf("GDT Base: 0x%08X\n", gp.base);
-    kprintf("GDT Limit: 0x%04X\n", gp.limit);
+    if (!s) {
+        switch (type) {
+            case 0x2: return "LDT";
+            case 0x9: return "TSS (avail)";
+            case 0xB: return "TSS (busy)";
+            case 0xE: return "Int Gate";
+            case 0xF: return "Trap Gate";
+            default:  return "System";
+        }
+    }
+    if (type & 0x08) {
+        if (type & 0x04) return (type & 0x02) ? "Code RX conf" : "Code X conf";
+        return (type & 0x02) ? "Code RX" : "Code X";
+    }
+    if (type & 0x04) return (type & 0x02) ? "Data RW down" : "Data RO down";
+    return (type & 0x02) ? "Data RW" : "Data RO";
+}
+
+void print_gdt_info(void)
+{
+    uint8_t c_head = COL(VGA_COLOR_LIGHT_CYAN);
+    uint8_t c_dim  = COL(VGA_COLOR_DARK_GREY);
+    uint8_t c_r0   = COL(VGA_COLOR_LIGHT_GREEN);
+    uint8_t c_r3   = COL(VGA_COLOR_LIGHT_MAGENTA);
+
+    kprintf_color(c_head, "GDTR  base=");
+    kprintf_color(COL(VGA_COLOR_WHITE), "0x%08X", gp.base);
+    kprintf_color(c_head, "  limit=");
+    kprintf_color(COL(VGA_COLOR_WHITE), "0x%04X", gp.limit);
+    kprintf_color(c_dim, "  (%d entries)\n", (gp.limit + 1) / 8);
+
+    kprintf_color(c_head,
+        " #  Sel   Base        Limit      Gran  D/B  Type          DPL  P\n");
+    kprintf_color(c_dim,
+        "--- ----- ----------- ---------- ----- ---- ------------- ---- --\n");
 
     for (int i = 0; i < 7; i++) {
         unsigned int base = (gdt[i].base_high << 24) |
@@ -52,65 +85,73 @@ void print_gdt_info()
         int dpl     = (access >> 5) & 3;
         int s       = (access >> 4) & 1;
         int type    = (access & 0x0F);
+        int g       = (gran >> 7) & 1;
+        int db      = (gran >> 6) & 1;
 
-        int g = (gran >> 7) & 1;
-        int db = (gran >> 6) & 1;
-        int l = (gran >> 5) & 1;
+        uint8_t row = c_dim;
+        if (present) row = dpl == 0 ? c_r0 : (dpl == 3 ? c_r3 : COL(VGA_COLOR_WHITE));
 
-        kprintf("Entry %d:\n", i);
-        kprintf("  Base:  0x%08X\n", base);
-        kprintf("  Limit: 0x%05X (%s)\n", limit, g ? "4KB pages" : "bytes");
-        kprintf("  Present: %s\n", present ? "Yes" : "No");
-        kprintf("  DPL: %d (Ring %d)\n", dpl, dpl);
-        kprintf("  Descriptor type: %s\n", s ? "Code/Data" : "System");
-
-        if (s) {
-            if (type & 0x08) // Executable bit
-                kprintf("  Segment: Code (%s)\n", (type & 0x02) ? "Readable" : "Exec only");
-            else
-                kprintf("  Segment: Data (%s)\n", (type & 0x02) ? "Writable" : "Read-only");
+        if (i == 0 && access == 0) {
+            kprintf_color(c_dim, " 0  0x00  ---------- ----------  --    --   NULL          -    -\n");
+            continue;
         }
 
-        kprintf("  Default size: %s\n", db ? "32-bit" : "16-bit");
-        if (l) kprintf("  64-bit code segment enabled\n");
-        kprintf("  Granularity flag: %s\n", g ? "4KB pages" : "Byte limit");
-        kprintf("\n");
+        kprintf_color(row,
+            " %d  0x%02X  0x%08X 0x%05X    %s  %s  %-13s %d    %s\n",
+            i, i * 8, base, limit,
+            g ? "4K" : "B ",
+            db ? "32" : "16",
+            seg_type_str(s, type),
+            dpl,
+            present ? "1" : "0");
     }
 }
 
-void push_values() {
-    __asm__ volatile(
-        "push $0x11111111\n\t"
-        "push $0x22222222\n\t"
-        "push $0x33333333\n\t"
-        "push $0x44444444\n\t"
-		"push $0x55555555\n\t"
-		"push $0x66666666\n\t"
-		"push $0x77777777\n\t"
-		"push $0x88888888\n\t"
-		"push $0x99999999\n\t"
-		"push $0xAAAAAAAA\n\t"
-		"push $0xBBBBBBBB\n\t"
-		"push $0xCCCCCCCC\n\t"
-		"push $0xDDDDDDDD\n\t"
-    );
+/*
+ * Dump the kernel stack in a GDB-style layout ("x/Nxw $esp"): four 32-bit
+ * words per row, each row prefixed with its address.  A handful of known
+ * marker values are written into a local array first so the dump has
+ * something recognisable to show.
+ */
+static int all_nibbles_equal(uint32_t v)
+{
+    uint32_t n = v & 0xF;
+    return v == (n * 0x11111111u) && n != 0;
 }
 
-void print_kernel_stack() 
+void print_kernel_stack(void)
 {
-	push_values();
-	uint32_t *stack_ptr = (uint32_t *)get_stack_pointer();
-	uint32_t *base_ptr = (uint32_t *)get_base_pointer();
+    volatile uint32_t markers[13];
+    for (int i = 0; i < 13; i++)
+        markers[i] = ((uint32_t)(i + 1) & 0xF) * 0x11111111u;
 
-	kprintf("Kernel Stack Pointer: 0x%08X\n", (unsigned int)stack_ptr);
-	kprintf("Base Pointer: 0x%08X\n", (unsigned int)base_ptr);
-	kprintf("Kernel Stack Contents:\n");
+    uint32_t esp = get_stack_pointer();
+    uint32_t ebp = get_base_pointer();
+    uint32_t *sp = (uint32_t *)esp;
 
-		kprintf("Address        |         Value\n");
-		kprintf("---------------|----------------\n");
-	for (int i = 0; i < 30; i++) {
-		kprintf("0x%08X     |  0x%08X\n", stack_ptr + i , stack_ptr[i]);
-	}
+    uint8_t c_addr = COL(VGA_COLOR_LIGHT_CYAN);
+    uint8_t c_word = COL(VGA_COLOR_LIGHT_GREY);
+    uint8_t c_mark = COL(VGA_COLOR_LIGHT_GREEN);
+    uint8_t c_ptr  = COL(VGA_COLOR_LIGHT_RED);
+
+    kprintf_color(COL(VGA_COLOR_LIGHT_CYAN), "esp = 0x%08X", esp);
+    kprintf_color(COL(VGA_COLOR_DARK_GREY), "   ");
+    kprintf_color(COL(VGA_COLOR_LIGHT_RED), "ebp = 0x%08X\n", ebp);
+    (void)markers;
+
+    for (int row = 0; row < 16; row++) {
+        kprintf_color(c_addr, "0x%08X:", (unsigned int)(sp + row * 4));
+        for (int col = 0; col < 4; col++) {
+            uint32_t *cell = sp + row * 4 + col;
+            uint32_t v = *cell;
+            uint8_t c = c_word;
+            if ((uint32_t)cell == esp || (uint32_t)cell == ebp) c = c_ptr;
+            else if (all_nibbles_equal(v)) c = c_mark;
+            kprintf_color(c, "  0x%08X", v);
+        }
+        kprintf("\n");
+    }
+    terminal_reset_color();
 }
 
 uint32_t get_stack_pointer() 

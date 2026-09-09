@@ -21,6 +21,14 @@ typedef struct {
 void cmd_help(int argc, char **argv);
 void cmd_stack(int argc, char **argv);
 void cmd_gdt(int argc, char **argv);
+void cmd_regs(int argc, char **argv);
+void cmd_eflags(int argc, char **argv);
+void cmd_cpuid(int argc, char **argv);
+void cmd_mem(int argc, char **argv);
+void cmd_uptime(int argc, char **argv);
+void cmd_fault(int argc, char **argv);
+void cmd_panic(int argc, char **argv);
+void cmd_colors(int argc, char **argv);
 void cmd_reboot(int argc, char **argv);
 void cmd_halt(int argc, char **argv);
 void cmd_clear(int argc, char **argv);

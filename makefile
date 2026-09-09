@@ -1,57 +1,69 @@
-# === File paths ===
-KERNEL_SRC = src/kernel.c src/helpers.c src/terminal.c src/kprintf.c src/gdt.c src/idt.c src/irq.c src/isrs.c src/kbdus.c src/shell.c
+# === KFS_2 =================================================================
 
-# === Build paths ===
-KERNEL_OBJ = build/kernel.o build/helpers.o build/terminal.o build/kprintf.o build/gdt.o build/idt.o build/irq.o build/isrs.o build/kbdus.o build/shell.o
+NAME       := kfs_2
 
-BOOT_SRC   = src/boot.s
-START_SRC  = src/start.asm
-LINKER     = src/linker.ld
+# === Toolchain (override on the command line if yours lives elsewhere) =====
+#   make CROSS_GCC=~/opt/cross/bin/i686-elf-gcc
+CROSS_GCC  ?= $(shell command -v i686-elf-gcc || echo i686-elf-gcc)
+CROSS_AS   ?= $(shell command -v i686-elf-as  || echo i686-elf-as)
+NASM       ?= nasm
 
-BOOT_OBJ   = build/boot.o
-START_OBJ  = build/start.o
-KERNEL_BIN = build/kernel.bin
-ISO_IMAGE  = build/kernel.iso
+# === Sources ==============================================================
+C_SOURCES  := $(wildcard src/*.c)
+C_OBJECTS  := $(patsubst src/%.c,build/%.o,$(C_SOURCES))
 
-# === Compiler and assembler paths ===
-CROSS_GCC  = /home/obeaj/opt/cross/bin/i686-elf-gcc
-CROSS_AS   = /home/obeaj/opt/cross/bin/i686-elf-as
+BOOT_SRC   := src/boot.s
+START_SRC  := src/start.asm
+LINKER     := src/linker.ld
 
-# === Default target ===
+BOOT_OBJ   := build/boot.o
+START_OBJ  := build/start.o
+KERNEL_BIN := build/kernel.bin
+ISO_IMAGE  := build/kernel.iso
+
+# === Flags ===============================================================
+CFLAGS     := -std=gnu99 -ffreestanding -O2 -Wall -Wextra \
+              -fno-builtin -fno-stack-protector -fno-pic -nostdlib -nodefaultlibs
+LDFLAGS    := -T $(LINKER) -ffreestanding -O2 -nostdlib -nodefaultlibs
+
+# === Rules ===============================================================
 all: $(ISO_IMAGE)
 
-# === Compile C files ===
 build/%.o: src/%.c
-	mkdir -p build
-	$(CROSS_GCC) -c $< -o $@ -std=gnu99 -ffreestanding -O2 -Wall -Wextra -fno-builtin -fno-stack-protector -nostdlib -nodefaultlibs
+	@mkdir -p build
+	$(CROSS_GCC) -c $< -o $@ $(CFLAGS)
 
-# === Compile boot.s ===
 $(BOOT_OBJ): $(BOOT_SRC)
-	mkdir -p build
+	@mkdir -p build
 	$(CROSS_AS) $< -o $@
 
-# === Compile start.asm ===
 $(START_OBJ): $(START_SRC)
-	mkdir -p build
-	nasm -f elf32 $< -o $@
+	@mkdir -p build
+	$(NASM) -f elf32 $< -o $@
 
-# === Link the kernel binary ===
-$(KERNEL_BIN): $(BOOT_OBJ) $(KERNEL_OBJ) $(START_OBJ)
-	$(CROSS_GCC) -T $(LINKER) -o $@ -ffreestanding -O2 -nostdlib -nodefaultlibs $^ -lgcc
+$(KERNEL_BIN): $(BOOT_OBJ) $(C_OBJECTS) $(START_OBJ)
+	$(CROSS_GCC) $(LDFLAGS) -o $@ $^ -lgcc
 
-# === Build ISO image with GRUB ===
 $(ISO_IMAGE): $(KERNEL_BIN)
-	mkdir -p isodir/boot/grub
+	@mkdir -p isodir/boot/grub
 	cp $< isodir/boot/kernel.bin
 	cp boot/grub/grub.cfg isodir/boot/grub/grub.cfg
-	grub-mkrescue -o $@ isodir
+	grub-mkrescue -d /usr/lib/grub/i386-pc -o $@ isodir
 
-# === Run the kernel with QEMU ===
+QEMU      ?= qemu-system-i386
+QEMUFLAGS ?= -m 512 -no-reboot
+
+# graphical window (host with a display)
 run: $(ISO_IMAGE)
-	qemu-system-i386 -cdrom $(ISO_IMAGE)
+	$(QEMU) -cdrom $(ISO_IMAGE) $(QEMUFLAGS)
 
-# === Clean build files ===
+# text mode inside the current terminal (headless VM / SSH); quit with Alt-2 then `quit`
+run-curses: $(ISO_IMAGE)
+	$(QEMU) -cdrom $(ISO_IMAGE) $(QEMUFLAGS) -display curses
+
 clean:
-	rm -rf build/*.o build/*.bin isodir
+	rm -rf build isodir
 
-.PHONY: all clean run
+re: clean all
+
+.PHONY: all run run-curses clean re

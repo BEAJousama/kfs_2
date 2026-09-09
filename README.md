@@ -1,5 +1,65 @@
-# kfs_1
+# KFS_2 — GDT & Interrupts, with a debug shell
 
+## Building
+
+The kernel needs an `i686-elf` cross-toolchain plus `nasm`, `grub-mkrescue`
+(`grub-pc-bin` + `xorriso`) and `qemu-system-i386`. A ready-to-use VM is
+described in the `Vagrantfile`; `install_gcc_cross.sh` builds the cross-GCC.
+
+```sh
+make                # build build/kernel.iso
+make run            # build + boot it in QEMU
+make re             # clean rebuild
+# point the build at your toolchain if it is not on PATH:
+make CROSS_GCC=~/opt/cross/bin/i686-elf-gcc CROSS_AS=~/opt/cross/bin/i686-elf-as
+```
+
+The work stays well under 10 MB.
+
+## Using the kernel
+
+On boot you land on **screen 0** with a status line. Four independent VGA
+screens are available:
+
+| Key                | Action                                   |
+|--------------------|------------------------------------------|
+| `ALT` + `Left/Right` | switch to the previous / next screen   |
+| `ALT` + `Up`         | jump to screen 0                       |
+| `ALT` + `Down`       | jump to the last screen               |
+| `Up` / `Down`        | scroll the current screen's backlog   |
+| `ESC`                | **open / close the debug shell**      |
+
+## The debug shell
+
+Press **`ESC`** to toggle the shell. It gives a `Shell $>` prompt with
+TAB completion and BACKSPACE editing.
+
+| Command  | Description |
+|----------|-------------|
+| `help`   | list every command |
+| `clear`  | clear the screen |
+| `echo`   | echo the arguments |
+| `gdt`    | dump the Global Descriptor Table as a colored table |
+| `stack`  | hex dump the kernel stack, gdb `x/xw` style, with `esp`/`ebp` highlighted |
+| `regs`   | dump the general-purpose, segment and control registers |
+| `eflags` | decode `EFLAGS` bit by bit |
+| `cpuid`  | CPU vendor string, family/model, feature flags |
+| `mem <addr> [words]` | hex + ASCII dump of arbitrary memory (e.g. `mem 0xB8000 16`) |
+| `uptime` | seconds since boot from the PIT (IRQ0 @ 100 Hz) |
+| `time`   | wall-clock time from the RTC |
+| `fault <div0\|bp\|gp\|ud>` | raise a CPU exception to exercise the fault handler |
+| `panic`  | trigger a test kernel panic |
+| `colors` | print the 16-colour VGA palette |
+| `reboot` / `halt` | reset / stop the machine |
+
+### Kernel panics
+
+Fatal faults (`#DE`, `#GP`, `#PF`, `#UD`, …) print a red panic screen with a
+full register dump and halt the CPU. Recoverable traps (`#BP` int3, `#DB`)
+print a yellow warning and execution resumes — this is the "not all panics
+are fatal" distinction asked for by the subject.
+
+---
 
 # Fundamentals:
 

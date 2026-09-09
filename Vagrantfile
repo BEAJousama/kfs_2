@@ -1,61 +1,40 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+#
+# Build VM for the KFS kernels. The host has no i686-elf cross toolchain, so
+# builds happen in here; run the resulting ISO either on the host or inside
+# the VM (see below).
+#
+#   vagrant up                # boot + provision (first run builds cross-gcc)
+#   vagrant ssh
+#   cd /home/vagrant/projects/kfs_2 && make        # -> build/kernel.iso
+#   cd /home/vagrant/projects/kfs3  && make
+#
+# Run a built ISO:
+#   - on the host:  qemu-system-i386 -cdrom build/kernel.iso -m 512
+#   - in the VM  :  make run                       (text mode, in the SSH term)
+#
+# Both kfs_2 and kfs3 are mounted under /home/vagrant/projects.
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "ubuntu/focal64"
-  
+  config.vm.box      = "bento/ubuntu-22.04"
+  config.vm.hostname = "kfs"
+
+  # ".." is the folder that contains both kfs_2/ and kfs3/
+  config.vm.synced_folder "..", "/home/vagrant/projects"
+
   config.vm.provider "virtualbox" do |vb|
-    vb.gui = true
-    vb.name = "KFS2-VM"
-    vb.memory = "4096"
-    vb.cpus = 3
-    vb.customize ["modifyvm", :id, "--accelerate3d", "on"]
-    vb.customize ["modifyvm", :id, "--vram", "128"]
-    vb.customize ["modifyvm", :id, "--clipboard", "bidirectional"]
-    vb.customize ["modifyvm", :id, "--draganddrop", "bidirectional"]
+    vb.gui    = false
+    vb.name   = "kfs-build"
+    vb.memory = 4096
+    vb.cpus   = 4
   end
-  
-  config.vm.synced_folder "/Users/obeaj/Desktop/kfs_2", "/home/vagrant/kfs_shared"
-  
-  config.vm.provision "shell", inline: <<-SHELL
-    apt-get update
-    apt-get install -y ubuntu-desktop-minimal
-    apt-get install -y virtualbox-guest-dkms virtualbox-guest-utils virtualbox-guest-x11
-    systemctl set-default graphical.target
-    
-    useradd -m -s /bin/bash obeaj
-    echo "obeaj:obeaj" | chpasswd
-    usermod -aG sudo obeaj
-    
-    mkdir -p /home/obeaj/kfs_2
-    mount --bind /home/vagrant/kfs_shared /home/obeaj/kfs_2
-    
-    echo "/home/vagrant/kfs_shared /home/obeaj/kfs_2 none bind 0 0" >> /etc/fstab
-    
-    chown -R obeaj:obeaj /home/obeaj/kfs_2
-    
-    usermod -aG vagrant obeaj
-    
-    apt-get install -y \
-      build-essential \
-      bison \
-      flex \
-      libgmp3-dev \
-      libmpc-dev \
-      libmpfr-dev \
-      texinfo \
-      libisl-dev \
-      qemu-system \
-      grub-pc-bin \
-      xorriso \
-      nasm \
-      curl \
-      gcc \
-      g++ \
-      make
-  SHELL
-  
-  config.vm.network "private_network", ip: "192.168.56.10"
-  config.vm.network "forwarded_port", guest: 80, host: 8080
-  config.vm.network "forwarded_port", guest: 3000, host: 3000
+
+  # Optional: libvirt/KVM instead of VirtualBox  ->  vagrant up --provider=libvirt
+  config.vm.provider "libvirt" do |lv|
+    lv.memory = 4096
+    lv.cpus   = 4
+  end
+
+  config.vm.provision "shell", path: "scripts/provision.sh"
 end
